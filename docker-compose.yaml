@@ -1,0 +1,89 @@
+version: "3"
+
+services:
+  rsshub:
+    image: diygod/rsshub
+    container_name: rsshub
+    hostname: rsshub
+    restart: always
+    labels:
+    - "traefik.enable=true"
+    - "traefik.docker.network=traefik"
+    - traefik.http.routers.rsshub.rule=Host(`rsshub.jinva.site`)
+    - traefik.http.routers.rsshub.tls=true
+    - traefik.http.routers.rsshub.tls.certresolver=default
+    - traefik.http.services.rsshub.loadbalancer.server.port=1200
+    networks:
+      traefik:
+        ipv4_address: 172.18.0.3
+    expose:
+        - 1200
+    environment:
+      NODE_ENV: production
+      CACHE_TYPE: redis
+      REDIS_URL: 'redis://redis:6379/'
+    depends_on:
+      - rsshub-db
+
+  rsshub-db:
+    image: redis:alpine
+    container_name: rsshub-db
+    hostname: rsshub-db
+    restart: always
+    volumes:
+        - rsshub-redis-data:/data
+    networks:
+        traefik:
+          ipv4_address: 172.18.0.4
+
+  freshrss:
+    image: freshrss/freshrss:latest
+    container_name: freshrss
+    hostname: freshrss
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - traefik.http.routers.freshrss.rule=Host(`freshrss.jinva.site`)
+      - traefik.http.routers.freshrss.tls=true
+      - traefik.http.routers.freshrss.tls.certresolver=default
+      - traefik.http.services.freshrss.loadbalancer.server.port=80
+    depends_on:
+      - freshrss-db
+    volumes:
+      - freshrss-data:/var/www/FreshRSS/data
+      - freshrss-extensions:/var/www/FreshRSS/extensions
+    networks:
+      traefik:
+        ipv4_address: 172.18.0.5
+    expose:
+      - 80
+    environment:
+      CRON_MIN: '*/45'
+      TZ: Asia/Shanghai
+
+  freshrss-db:
+    image: mysql
+    container_name: freshrss-db
+    hostname: freshrss-db
+    restart: unless-stopped
+    volumes:
+      - fressrss-mysql-data:/var/lib/mysql
+    networks:
+      traefik:
+        ipv4_address: 172.18.0.6
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: freshrss
+      MYSQL_USER: freshrss
+      MYSQL_PASSWORD: freshrss
+
+volumes:
+  fressrss-mysql-data:
+  rsshub-redis-data:
+  freshrss-data:
+  freshrss-extensions:
+
+networks:
+  traefik:
+    external: true
